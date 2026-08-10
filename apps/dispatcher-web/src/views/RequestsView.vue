@@ -4,9 +4,26 @@ import AppShell from '../components/AppShell.vue'
 import RequestList from '../components/RequestList.vue'
 import RequestSlideOver from '../components/RequestSlideOver.vue'
 import ToastStack from '../components/ui/ToastStack.vue'
-import { fetchRequests, requests, type RelocationRequest } from '../composables/useRequests'
+import {
+  fetchRequests,
+  requests,
+  ensureDriverProfile,
+  type RelocationRequest,
+} from '../composables/useRequests'
+import { useRequestsRealtime } from '../composables/useRealtime'
 
-onMounted(fetchRequests)
+onMounted(async () => {
+  await fetchRequests()
+  // Rows that were already booked before this page loaded still need a face and a name.
+  await Promise.all(
+    [...new Set(requests.value.map((r) => r.driver_id).filter((id): id is string => !!id))].map(
+      ensureDriverProfile,
+    ),
+  )
+})
+
+// Mounted here, never at module top level: the channel must not exist before the session does.
+useRequestsRealtime()
 
 const panelOpen = ref(false)
 const editing = ref<RelocationRequest | null>(null)

@@ -125,6 +125,31 @@ export async function cancelRequest(id: string): Promise<RelocationRequest> {
   return data
 }
 
+/** The money shot needs the booking driver's face and name. profiles_select_all is
+ *  `using (true)` precisely so the dispatcher can read them. Cached per id: a booking
+ *  storm must not turn into one request per event. */
+export interface DriverProfile {
+  id: string
+  full_name: string | null
+  avatar_url: string | null
+}
+export const driverProfiles = ref<Record<string, DriverProfile>>({})
+
+export async function ensureDriverProfile(id: string): Promise<DriverProfile | null> {
+  const cached = driverProfiles.value[id]
+  if (cached) return cached
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, avatar_url')
+    .eq('id', id)
+    .maybeSingle<DriverProfile>()
+
+  if (error || !data) return null
+  driverProfiles.value = { ...driverProfiles.value, [id]: data }
+  return data
+}
+
 export function patchLocal(row: RelocationRequest): void {
   const i = requests.value.findIndex((r) => r.id === row.id)
   if (i === -1) requests.value = [row, ...requests.value]

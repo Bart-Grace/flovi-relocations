@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import StatusPill from './StatusPill.vue'
-import type { RelocationRequest } from '../composables/useRequests'
+import { driverProfiles, type RelocationRequest } from '../composables/useRequests'
 
 const props = defineProps<{ request: RelocationRequest }>()
 defineEmits<{ open: [RelocationRequest] }>()
+
+const driver = computed(() =>
+  props.request.driver_id ? (driverProfiles.value[props.request.driver_id] ?? null) : null,
+)
 
 const pickup = computed(() =>
   new Date(props.request.pickup_date + 'T00:00:00').toLocaleDateString(undefined, {
@@ -44,7 +48,18 @@ const price = computed(() =>
           </svg>
           <span class="truncate">{{ request.destination }}</span>
         </span>
-        <span v-if="request.notes" class="mt-0.5 block truncate text-xs text-brand-400">
+        <!-- The money shot: who took it, with their real Google face and name. -->
+        <span v-if="driver" class="mt-1 flex items-center gap-1.5">
+          <img
+            v-if="driver.avatar_url"
+            :src="driver.avatar_url"
+            alt=""
+            class="size-4 rounded-full ring-1 ring-brand-700"
+            referrerpolicy="no-referrer"
+          />
+          <span class="truncate text-xs text-brand-300">{{ driver.full_name }}</span>
+        </span>
+        <span v-else-if="request.notes" class="mt-0.5 block truncate text-xs text-brand-400">
           {{ request.notes }}
         </span>
       </span>

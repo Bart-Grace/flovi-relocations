@@ -387,3 +387,37 @@ right.
 **Cost:** ~21 min · verified by browser interaction against production and a SQL read-back.
 
 ---
+
+### T+125 — Realtime worked first try, because the order was treated as the specification (prompt 09)
+
+**Prompt (abridged):** the dispatcher list patches itself when a row changes from another client, with no
+refresh. Out of scope: no presence, no broadcast, no reconnect UI, no RLS changes, no Flutter changes.
+
+**What was wrong:** nothing. This is the slice the plan budgets the most time for and reserves an entire
+fallback branch for — a five-second poll — and it delivered events on the first attempt.
+
+**Why, specifically.** The failure mode here is not subtle code, it is order. supabase-js does not hand the
+session token to the Realtime socket by itself, so a channel created before `setAuth` reports `SUBSCRIBED`
+and delivers nothing: a socket that looks healthy in every way except that no events arrive. The sequence
+was written as the contract of the composable, with the reason for each step next to it —
+`getSession()` → `realtime.setAuth(token)` → re-auth on `TOKEN_REFRESHED` → *only then* create the channel,
+in `onMounted` → `removeChannel` in `onUnmounted` — and the channel is never created at module scope, where
+it would run before the session is restored from storage.
+
+The second trap, three toasts per booking, is prevented by the same discipline: `supabase.channel('name')`
+called twice creates a **second** channel rather than returning the existing one, so there is exactly one
+channel per concern, created on mount and removed on unmount.
+
+**Verified live against production, without touching the browser between cause and effect.** With the
+dispatcher list open, `book_request` was called from `psql` as Driver B — the same RPC the driver app calls,
+so the path under test is identical. The row's pill went from amber **Open** to blue **Booked**, Driver B's
+avatar and name faded in underneath the route, and **exactly one** toast appeared reading
+*"Driver B booked Gdańsk → Rotterdam."* No refresh, no refetch — the handler patches the array in place.
+
+**A negative result worth as much as the positive one:** releasing the gig, which is also an UPDATE on the
+same row, produced a silent patch and **no toast**. The money-shot condition is a transition — `driver_id`
+going from empty to set — not merely "an update happened". Without that, every edit would announce itself.
+
+**Cost:** ~19 min · verified by a live booking driven from SQL while the deployed page sat untouched.
+
+---
