@@ -120,3 +120,45 @@ arrives back at the app URL, which by itself already proved Google was not block
 **Cost:** ~4 min · verified by three rows in `auth.users`, each with `full_name` and `avatar_url`.
 
 ---
+
+### T+45 — The data contract, applied and raced (prompt 02)
+
+**Prompt (abridged):** one migration, four blocks A–D, each ending in its own verification query. Out of
+scope: no enum types, no roles table, no DELETE policy, no seed script, no generated types, no client code.
+
+**What came back:** `supabase/migrations/0001_init.sql` ran top to bottom with `ON_ERROR_STOP=1` and exit 0.
+
+**What was wrong:** nothing in the SQL — this slice worked first try. One shell defect on the way: the
+connection arguments were held in a variable and passed unquoted, which works in bash but **not in zsh**,
+where unquoted parameter expansion is not word-split. `psql` received one 90-character hostname and failed
+with `could not translate host name " aws-0-... -p 5432 -U ..."`. Inlining the arguments fixed it. Worth
+recording because the error text points at DNS and the cause is the shell.
+
+**Verified, not assumed** — all four verification queries matched the expected lines exactly:
+`profiles | 5` and `relocation_requests | 13` · six policies, every `relrowsecurity = t`, every role
+`{authenticated}`, no `ALL`, no `DELETE` · both functions `prosecdef = t`,
+`proconfig = {"search_path=\"\""}`, `auth_exec = t`, `anon_exec = f` ·
+`supabase_realtime | public | relocation_requests`.
+
+**The race, proven live rather than reasoned about.** Two concurrent `psql` sessions on the session pooler,
+each setting `request.jwt.claims` to a different driver and calling `book_request` on the same row. Driver A
+committed `booked`; Driver B blocked on the row lock, re-evaluated after the commit, matched nothing and
+raised verbatim:
+
+```
+ERROR:  This gig is no longer available
+CONTEXT:  PL/pgSQL function public.book_request(uuid) line 18 at RAISE
+```
+
+This settles the last open assumption in the plan — that READ COMMITTED gives the guarded UPDATE its
+atomicity — with an observation instead of a citation.
+
+**One thing worth naming.** The dispatcher-books-own-gig guard (`dispatcher_id <> v_uid`) raises the *same*
+message as a lost race. Confirmed by calling it as the dispatcher. That ambiguity is exactly why the demo
+needs three Google accounts: on two accounts the double-booking scene would pass for the wrong reason, and
+that is a question I could not answer honestly on stage.
+
+**Cost:** ~14 min · verified by the four queries, the two-session race, and a `release_request` round trip
+that returned the row to `open` and left the database clean for the demo.
+
+---
