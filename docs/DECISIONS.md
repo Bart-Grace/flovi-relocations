@@ -225,3 +225,44 @@ deep link `/requests/abc` returns 200, so the SPA rewrite is live · the deploye
 **Cost:** ~7 min · verified by a line count, three HTTP status codes, and a grep of the deployed bundle.
 
 ---
+
+### T+65 — Two instructions in the plan were wrong about the SDK; reading it settled both (prompt 06)
+
+**Prompt (abridged):** a deployed Flutter web app where a second Google account signs in and reaches an empty
+two-tab shell. Out of scope: no gig list, no booking, no queries of any kind.
+
+**What was wrong — first:** the plan specifies `signInWithOAuth(..., webOnlyWindowName: '_self')`. That named
+parameter **does not exist** in `supabase_flutter` 2.17.1. Reading the signature, the only options are
+`redirectTo`, `scopes`, `authScreenLaunchMode` and `queryParams`. Reading one level deeper, the SDK's private
+`_launchAuthUrl` already hardcodes `webOnlyWindowName: '_self'` — the instruction was describing behaviour
+that is now the library's, not the caller's. Dropped it.
+
+**What was wrong — second:** the plan treats `redirectTo` as optional on web. It is not, here. With no
+`redirectTo`, Supabase falls back to the Site URL, which is the **dispatcher** app — a driver signing in
+would land in the wrong product with a valid session, and nothing would look broken. Passing
+`kIsWeb ? Uri.base.origin : ...` fixes it, and that origin is already in the Supabase allow-list.
+
+**Third, in our favour:** `Supabase.initialize` accepts `publishableKey` directly in this version, so no
+`anonKey` fallback was needed.
+
+**Service worker, prevented rather than mitigated.** The plan's advice for trap 14 is "verify every driver
+deploy in fresh incognito", with stripping the registration as a 2-minute fix. I did the fix first: the
+custom bootstrap calls `_flutter.loader.load({onEntrypointLoaded})` with **no** `serviceWorkerSettings`, and
+the registration path in the loader is entered only when that key is present — confirmed by reading the
+emitted bundle, not by trusting the omission. The same callback removes the branded loader at the right
+moment, so there is no white flash while the engine boots.
+
+**One deletion worth declaring:** `test/widget_test.dart`, the scaffold's counter-app test, referenced a
+`MyApp` class that does not exist here and was the only thing `flutter analyze` complained about. It tested
+nothing in this project. Removed rather than repaired — there is no automated suite in this build, and the
+correctness story is the two-window booking test.
+
+**Verified:** `flutter analyze` clean · release build green with the default CanvasKit renderer, no
+`--web-renderer`, no `--wasm` · `deploy-driver.sh` stdout is 1 line · the deployed URL and a deep link both
+return 200 anonymously · `vercel project ls` shows exactly two projects, so the fatal trap-9 duplication did
+not happen · the deployed `main.dart.js` contains the Supabase URL, so `--dart-define` reached the bundle.
+
+**Cost:** ~18 min · verified by pasted analyzer and build output, four HTTP status codes, and greps of the
+deployed bundle.
+
+---
