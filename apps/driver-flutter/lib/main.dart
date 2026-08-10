@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'features/gigs/available_gigs_page.dart';
 import 'features/gigs/my_gigs_page.dart';
+import 'phone_frame.dart';
 import 'theme.dart';
 
 // Config arrives via --dart-define only. There is no committed constants file, and these
@@ -43,6 +44,8 @@ class FloviDriverApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
+      // Everything the app renders lives inside the device frame on wide viewports.
+      builder: (context, child) => PhoneFrame(child: child ?? const SizedBox.shrink()),
       home: const AuthGate(),
     );
   }
