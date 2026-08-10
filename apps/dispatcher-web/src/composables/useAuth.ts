@@ -62,10 +62,15 @@ export async function signInWithGoogle(): Promise<void> {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      // The origin, not a callback path. Google's redirect URI is always and only the
-      // Supabase callback; this is where Supabase sends the browser afterwards, and it
-      // must appear in the Supabase redirect allow-list.
-      redirectTo: window.location.origin,
+      // The origin WITH a trailing slash, not a callback path. Google's redirect URI is
+      // always and only the Supabase callback; this is where Supabase sends the browser
+      // afterwards, and it must match the allow-list.
+      //
+      // The slash is load-bearing: the allow-list entry is `<origin>/**` and that glob
+      // does not match a bare origin, which is exactly what window.location.origin returns.
+      // A mismatch is silent — Supabase falls back to the Site URL. Here that happens to
+      // BE this app, so the bug is invisible in the dispatcher and fatal in the driver.
+      redirectTo: `${window.location.origin}/`,
       queryParams: { prompt: 'select_account' },
     },
   })

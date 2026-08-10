@@ -90,11 +90,15 @@ class _SignInScreenState extends State<SignInScreen> {
     try {
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
-        // On web we must name the origin: without it Supabase falls back to the Site URL,
-        // which is the dispatcher app, and the driver would land in the wrong product.
+        // The TRAILING SLASH is load-bearing. The allow-list entry is
+        // `https://flovi-driver-bl.vercel.app/**`, and that glob does not match a bare
+        // origin — `Uri.base.origin` returns no trailing slash. Without it Supabase
+        // rejects the target and silently falls back to the Site URL, which is the
+        // DISPATCHER app: the driver signs in and lands in the wrong product, holding a
+        // perfectly valid session, with nothing that looks like an error.
         // The SDK already forces webOnlyWindowName '_self' internally, so this navigates
         // the current tab and the PKCE verifier stays on the origin that started the flow.
-        redirectTo: kIsWeb ? Uri.base.origin : 'com.flovi.driver://login-callback',
+        redirectTo: kIsWeb ? '${Uri.base.origin}/' : 'com.flovi.driver://login-callback',
         authScreenLaunchMode:
             kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
         queryParams: const {'prompt': 'select_account'},

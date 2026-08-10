@@ -305,3 +305,44 @@ were my own comments naming the ban).
 **Cost:** ~16 min, of which ~5 were spent on a defect that did not exist.
 
 ---
+
+### T+90 — One missing slash sent every driver into the dispatcher app
+
+**Symptom, as reported:** signing in on the driver app showed "Continue with Google" **twice**, and the
+second screen led to the dispatcher's request table. No error anywhere, in either app.
+
+**Root cause:** the Supabase redirect allow-list entry is `https://flovi-driver-bl.vercel.app/**`. That glob
+does not match a **bare origin** — and `Uri.base.origin` in Dart, like `window.location.origin` in the
+browser, returns no trailing slash. Supabase rejected the target and fell back to the Site URL, which is the
+dispatcher. The driver ended up in the wrong product holding a completely valid session.
+
+**Proved before changing anything**, by driving the allow-list from the outside — start a flow, capture the
+`state` Supabase issued, then return to `/callback` with an error and read where it sends us:
+
+```
+https://flovi-driver-bl.vercel.app/   (with slash)  ->  https://flovi-driver-bl.vercel.app/
+https://flovi-driver-bl.vercel.app    (no slash)    ->  https://flovi-dispatcher-bl.vercel.app
+```
+
+**The part that matters more than the fix.** The *dispatcher* has the identical bug — it also passed a bare
+`window.location.origin`. It is invisible there for one reason only: the fallback destination happens to be
+the dispatcher itself. A silently wrong value that coincides with the right answer in the app you test first,
+and is fatal in the app you test second. Both were fixed; neither would have been found by testing the
+dispatcher.
+
+**Why the code fix, not the console fix.** Adding the bare origin to the allow-list would also have worked
+and taken one click. The trailing slash is better: it is one place per app, needs no console round trip and
+no Google/Supabase propagation wait, and it leaves the allow-list stating exactly one shape per origin
+instead of two.
+
+**Two shell defects on the way, both zsh-specific and both misleading:** earlier, unquoted parameter
+expansion is not word-split in zsh, so `psql` received one giant hostname and reported a DNS failure. Here,
+`for path in ...` clobbered `PATH` itself — `path` is tied to `PATH` in zsh — and the loop reported
+`command not found: curl`. Both errors pointed at the environment; both causes were the shell.
+
+**Verified:** the allow-list probe above · `flutter analyze` clean · the deployed `main.dart.js` hashes
+byte-identical to the locally built file, so production is running exactly the audited artifact.
+
+**Cost:** ~11 min · verified by the callback probe and a SHA-256 comparison against production.
+
+---
