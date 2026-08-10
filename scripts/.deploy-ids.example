@@ -1,0 +1,6 @@
+# UNTRACKED — see .gitignore. Prevents plan.md trap 9: `flutter build web` wipes build/web
+# together with .vercel/project.json, and the next `--yes` deploy silently creates a NEW
+# project on a NEW URL — after the old one is already in the submission email.
+# These are the DRIVER project's ids, because deploy-driver.sh is the script that needs them.
+VERCEL_ORG_ID=team_xxxxxxxxxxxxxxxxxxxxxxxx
+VERCEL_PROJECT_ID=prj_xxxxxxxxxxxxxxxxxxxxxxxxxxxx

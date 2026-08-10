@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Deploy
+.vercel/
+
+# Secrets — never commit. See CLAUDE.md § Security invariants.
+.env
+.env.*
+!.env.example
+scripts/.deploy-ids
+
+# OS / editor
+.DS_Store
+*.swp
