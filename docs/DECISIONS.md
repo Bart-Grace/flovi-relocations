@@ -346,3 +346,44 @@ byte-identical to the locally built file, so production is running exactly the a
 **Cost:** ~11 min · verified by the callback probe and a SHA-256 comparison against production.
 
 ---
+
+### T+100 — TypeScript said string, Vue made it a number (prompt 08)
+
+**Prompt (abridged):** create and edit a relocation request from a right-hand slide-over, with the list
+reflecting the save. Out of scope: no realtime, no optimistic UI, no focus trap, no assigning a driver.
+
+**What was wrong:** the first real submission failed with a toast reading
+`S.value.replace is not a function`.
+
+**Root cause:** `const priceEuros = ref('')` infers `Ref<string>`, so `priceEuros.value.replace(',', '.')`
+type-checks and `vue-tsc` passes. But Vue 3 applies the **`.number` modifier automatically** to
+`<input type="number">`, so the moment the user types, the ref holds a `number`. The static type and the
+runtime value disagree, and nothing in the toolchain can see it: the cast happens inside Vue's v-model
+compilation, below TypeScript's view.
+
+**How it was caught:** by submitting the form in a browser against production. `vue-tsc --noEmit`, the
+build, and every structural grep were green. A type system that is lied to reports no error.
+
+**What I changed:** typed the ref `string | number` — with the reason on the line above it, because
+`ref('')` is what anyone would write next time — and normalised with `String(...)` before parsing.
+
+**What went right, and is worth more than the bug.** The failure surfaced as a toast carrying the verbatim
+message, and **the panel stayed open** — the half-filled form was still there. That is the behaviour prompt
+08 specified for a rejected write, and it was exercised for real by an accident rather than by a drill.
+
+**One acceptance criterion could not be tested through the UI.** "A CHECK violation surfaces as a toast" was
+not reachable from the form: the price input carries `min="0"`, so the browser blocks a negative value before
+any request is made. The constraint itself was verified directly against the database, which rejects it —
+`violates check constraint "relocation_requests_price_cents_check"`. Defence in depth, but stated plainly
+rather than ticked off.
+
+**Verified in production, as Driver A signing into the dispatcher app** — an account with zero rows, which
+also exercised the empty state: icon, one line, CTA · create → row appears as `Gdańsk → Hamburg` with an
+amber **Open** pill, `450,00 €`, and a confirming toast · edit → destination becomes `Rotterdam` and the row
+text changes · cancel → the pill turns zinc **Cancelled** and **the row still exists**; a query confirms
+three rows and no deletion anywhere · `price_cents` stored as `45000`, so the euro-to-cents conversion is
+right.
+
+**Cost:** ~21 min · verified by browser interaction against production and a SQL read-back.
+
+---

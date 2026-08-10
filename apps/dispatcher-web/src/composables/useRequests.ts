@@ -62,3 +62,71 @@ export async function fetchRequests(): Promise<void> {
   }
   requests.value = data ?? []
 }
+
+/** What the form is allowed to send. Note what is absent: dispatcher_id and status.
+ *  Both have column defaults — `default auth.uid()` and `default 'open'` — and sending
+ *  them from the client would mean trusting the client with authorship and state. */
+export interface RequestDraft {
+  origin: string
+  destination: string
+  pickup_date: string
+  notes: string | null
+  vehicle_type: string | null
+  price_cents: number
+}
+
+export async function createRequest(draft: RequestDraft): Promise<RelocationRequest> {
+  const { data, error } = await supabase
+    .from('relocation_requests')
+    .insert(draft)
+    .select(REQUEST_COLUMNS)
+    .single<RelocationRequest>()
+
+  // PostgREST answers a policy rejection with 200 and no row, so "no error" is not "success".
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('The write was rejected — no row came back.')
+
+  requests.value = [data, ...requests.value]
+  return data
+}
+
+export async function updateRequest(
+  id: string,
+  patch: Partial<RequestDraft>,
+): Promise<RelocationRequest> {
+  const { data, error } = await supabase
+    .from('relocation_requests')
+    .update(patch)
+    .eq('id', id)
+    .select(REQUEST_COLUMNS)
+    .single<RelocationRequest>()
+
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('The write was rejected — no row came back.')
+
+  patchLocal(data)
+  return data
+}
+
+/** Cancelling is a status transition, never a SQL DELETE: a cancelled gig keeps its history,
+ *  and the booked_requires_driver CHECK is written to allow 'cancelled' from any state. */
+export async function cancelRequest(id: string): Promise<RelocationRequest> {
+  const { data, error } = await supabase
+    .from('relocation_requests')
+    .update({ status: 'cancelled' })
+    .eq('id', id)
+    .select(REQUEST_COLUMNS)
+    .single<RelocationRequest>()
+
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('The write was rejected — no row came back.')
+
+  patchLocal(data)
+  return data
+}
+
+export function patchLocal(row: RelocationRequest): void {
+  const i = requests.value.findIndex((r) => r.id === row.id)
+  if (i === -1) requests.value = [row, ...requests.value]
+  else requests.value[i] = row
+}
