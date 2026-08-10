@@ -158,6 +158,47 @@ export async function ensureDriverProfile(id: string): Promise<DriverProfile | n
   return data
 }
 
+/** Everyone this dispatcher could hand a job to. There is no role column in the schema
+ *  — deliberately, see prompt 02 — so "drivers" is every other profile. Naming that here
+ *  rather than inventing a role model on the way to a demo. */
+export const assignablePeople = ref<DriverProfile[]>([])
+
+export async function fetchAssignablePeople(): Promise<void> {
+  const uid = user.value?.id
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, avatar_url')
+    .order('full_name')
+    .returns<DriverProfile[]>()
+
+  if (error || !data) return
+  assignablePeople.value = data.filter((p) => p.id !== uid)
+  // Seed the avatar cache so an assigned row renders a face immediately.
+  driverProfiles.value = { ...driverProfiles.value, ...Object.fromEntries(data.map((p) => [p.id, p])) }
+}
+
+/** Assignment goes through an RPC, never a client UPDATE of driver_id/status/booked_at.
+ *  Those three columns are interdependent and belong to one transition, not three fields. */
+/** These RPCs return a single composite row, not a set. `.returns<T>()` models the
+ *  array case and rejects it, so the shape is asserted once, here, and checked for null
+ *  the same way every other mutation is. */
+async function callRowRpc(fn: string, params: Record<string, string>): Promise<RelocationRequest> {
+  const { data, error } = await supabase.rpc(fn, params)
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('The write was rejected — no row came back.')
+  const row = data as RelocationRequest
+  patchLocal(row)
+  return row
+}
+
+export function assignDriver(id: string, driverId: string): Promise<RelocationRequest> {
+  return callRowRpc('assign_driver', { p_request_id: id, p_driver_id: driverId })
+}
+
+export function unassignDriver(id: string): Promise<RelocationRequest> {
+  return callRowRpc('unassign_driver', { p_request_id: id })
+}
+
 export function patchLocal(row: RelocationRequest): void {
   const i = requests.value.findIndex((r) => r.id === row.id)
   if (i === -1) requests.value = [row, ...requests.value]

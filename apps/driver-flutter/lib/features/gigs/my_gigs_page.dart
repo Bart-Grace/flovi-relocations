@@ -19,12 +19,31 @@ class _MyGigsPageState extends State<MyGigsPage> {
   // Field, initialised once. The page lives inside an IndexedStack, so this
   // subscription survives every tab switch instead of being rebuilt.
   late final Stream<List<Map<String, dynamic>>> _stream;
+  late final String _uid;
+
+  String? _busyId;
 
   @override
   void initState() {
     super.initState();
-    final uid = Supabase.instance.client.auth.currentUser!.id;
-    _stream = GigRepository().myGigs(uid);
+    _uid = Supabase.instance.client.auth.currentUser!.id;
+    _stream = GigRepository().allRequests();
+  }
+
+  Future<void> _release(RelocationRequest gig) async {
+    setState(() => _busyId = gig.id);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await GigRepository().release(gig.id);
+      messenger.showSnackBar(SnackBar(content: Text('Released ${gig.route}.')));
+      // The row leaves this list and reappears in Available on its own, through the
+      // stream — nothing is removed by hand here.
+    } on PostgrestException catch (e) {
+      // Verbatim — release_request already says "This gig is not yours to release".
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
   }
 
   @override
@@ -43,7 +62,12 @@ class _MyGigsPageState extends State<MyGigsPage> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final gigs = snapshot.data!.map(RelocationRequest.fromMap).toList();
+        // Client-side predicate — see GigRepository.allRequests for why it cannot be
+        // pushed to the server now that a gig can be released.
+        final gigs = snapshot.data!
+            .map(RelocationRequest.fromMap)
+            .where((r) => r.driverId == _uid)
+            .toList();
         if (gigs.isEmpty) {
           return _EmptyMyGigs(
             icon: Icons.local_shipping_outlined,
@@ -58,7 +82,22 @@ class _MyGigsPageState extends State<MyGigsPage> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           itemCount: gigs.length,
           separatorBuilder: (_, _) => const SizedBox(height: 12),
-          itemBuilder: (context, i) => GigCard(request: gigs[i]),
+          itemBuilder: (context, i) => GigCard(
+            request: gigs[i],
+            trailing: gigs[i].status == 'booked'
+                ? OutlinedButton(
+                    onPressed: _busyId == gigs[i].id ? null : () => _release(gigs[i]),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(42)),
+                    child: _busyId == gigs[i].id
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Cancel booking'),
+                  )
+                : null,
+          ),
         );
       },
     );

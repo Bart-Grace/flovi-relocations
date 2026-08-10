@@ -589,3 +589,44 @@ deployed board, and the last defect only surfaced after booking one row to check
 **Cost:** ~22 min · verified by re-screenshotting production after each change.
 
 ---
+
+### T+200 — Features after the freeze, and a note that came true
+
+**Scope, requested explicitly after `t185-freeze` was tagged:** dispatcher can assign and unassign a driver,
+driver can cancel their own booking, and the success toast should look like a success. Recorded as a
+deliberate override of my own rule rather than a lapse — the freeze existed to protect the docs sprint, and
+the person whose sprint it is chose to spend it.
+
+**The assignment feature is the one the whole design had been refusing.** Prompt 08 says, in its out-of-scope
+list, "no assigning a driver from this form", with the reason that it is exactly the field a model adds
+unprompted and it needs the UPDATE policy the design refuses to grant. Building it now did not overturn that
+— it went in the only way consistent with it. A dispatcher *does* hold an UPDATE policy on their own rows, so
+`set driver_id = …, status = 'booked'` from the client would have passed RLS. It is still wrong: it puts
+three interdependent columns under client control, leaving CHECK constraints as the only thing between a typo
+and a row that is `booked` with no driver. `assign_driver` and `unassign_driver` are single guarded UPDATEs
+in SECURITY DEFINER functions, same shape as `book_request`. **The client names an intent, never a state.**
+
+**`release_request` needed no code at all.** It has been in `0001_init.sql` since the first migration — the
+plan listed it as "the function ships, the button does not". Wiring the driver's cancel button was a
+repository method and a widget. The guard was never the part that was missing.
+
+**A note I left three slices ago fired.** In `GigRepository.myGigs` I had written: *"If a release button is
+ever added, this filter has to move client-side for the same reason it did in AvailableGigsPage."* Adding
+that button is exactly what this change does. `release_request` clears `driver_id`, the row leaves the
+`.eq('driver_id', …)` filter, and — per the SDK behaviour found in prompt 11 — that UPDATE would never be
+delivered, so a released gig would hang in My gigs forever. The filter moved client-side before the button
+shipped, not after a bug report. Writing down the precondition, not just the fix, is what made that possible.
+
+**One self-inflicted test failure worth recording.** The first `assign_driver` check reported success and the
+UI still showed `Open`. The RPC was fine: my heredoc ran `begin;` and ended without `commit;`, so psql exited
+and rolled the transaction back. The test proved the logic and persisted nothing — a green result that
+verified less than it appeared to.
+
+**Verified in production:** `assign_driver` returns `booked` with the driver set, and refuses self-assignment
+with `You cannot assign yourself to your own request` · the assigned driver appears in the slide-over with
+avatar and a Remove button · Remove flips the row back to **Open** live, with a green toast reading
+"Gdańsk → Hamburg is open again." · all four RPCs report `prosecdef = t`, empty `search_path`, `anon_exec = f`.
+
+**Cost:** ~26 min.
+
+---

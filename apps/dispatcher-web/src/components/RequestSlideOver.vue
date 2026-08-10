@@ -6,6 +6,10 @@ import {
   createRequest,
   updateRequest,
   cancelRequest,
+  assignDriver,
+  unassignDriver,
+  assignablePeople,
+  driverProfiles,
   type RelocationRequest,
   type RequestDraft,
 } from '../composables/useRequests'
@@ -72,6 +76,42 @@ async function onSubmit() {
     emit('close')
   } catch (e) {
     // The panel stays open on failure — a rejected write must not look like a save.
+    pushToast('error', e instanceof Error ? e.message : String(e))
+  } finally {
+    busy.value = false
+  }
+}
+
+const pickedDriver = ref('')
+
+const assignedDriver = computed(() =>
+  props.request?.driver_id ? (driverProfiles.value[props.request.driver_id] ?? null) : null,
+)
+
+async function onAssign() {
+  if (!props.request || !pickedDriver.value) return
+  busy.value = true
+  try {
+    const row = await assignDriver(props.request.id, pickedDriver.value)
+    const who = driverProfiles.value[row.driver_id ?? '']?.full_name ?? 'Driver'
+    pushToast('success', `${who} assigned to ${row.origin} → ${row.destination}.`)
+    pickedDriver.value = ''
+    emit('close')
+  } catch (e) {
+    pushToast('error', e instanceof Error ? e.message : String(e))
+  } finally {
+    busy.value = false
+  }
+}
+
+async function onUnassign() {
+  if (!props.request) return
+  busy.value = true
+  try {
+    const row = await unassignDriver(props.request.id)
+    pushToast('success', `${row.origin} → ${row.destination} is open again.`)
+    emit('close')
+  } catch (e) {
     pushToast('error', e instanceof Error ? e.message : String(e))
   } finally {
     busy.value = false
@@ -157,6 +197,55 @@ async function onCancelRequest() {
           <FormField label="Notes" hint="optional">
             <textarea v-model="notes" rows="3" :class="INPUT" placeholder="Two-seater, ground floor" />
           </FormField>
+
+          <!-- Driver assignment. Both transitions are RPCs; the form above never touches
+               driver_id, status or booked_at. -->
+          <div v-if="isEdit" class="border-t border-brand-900 pt-4">
+            <p class="mb-2 text-sm font-medium text-brand-100">Driver</p>
+
+            <div
+              v-if="assignedDriver"
+              class="flex items-center gap-3 rounded-(--radius-card) border border-brand-800 bg-brand-900/50 px-3 py-2.5"
+            >
+              <img
+                v-if="assignedDriver.avatar_url"
+                :src="assignedDriver.avatar_url"
+                alt=""
+                class="size-7 shrink-0 rounded-full ring-1 ring-brand-700"
+                referrerpolicy="no-referrer"
+              />
+              <span class="min-w-0 flex-1 truncate text-sm">{{ assignedDriver.full_name }}</span>
+              <button
+                type="button"
+                :disabled="busy"
+                class="shrink-0 rounded-sm border border-brand-700 px-2.5 py-1 text-xs text-brand-200 transition hover:bg-brand-800 focus-visible:ring-3 focus-visible:ring-brand-500 focus-visible:outline-hidden disabled:opacity-60"
+                @click="onUnassign"
+              >
+                Remove
+              </button>
+            </div>
+
+            <div v-else-if="request?.status === 'open'" class="flex gap-2">
+              <select v-model="pickedDriver" :class="INPUT">
+                <option value="">Choose someone…</option>
+                <option v-for="p in assignablePeople" :key="p.id" :value="p.id">
+                  {{ p.full_name }}
+                </option>
+              </select>
+              <button
+                type="button"
+                :disabled="busy || !pickedDriver"
+                class="shrink-0 rounded-(--radius-card) border border-brand-700 px-3 py-2 text-sm text-brand-100 transition hover:bg-brand-900 focus-visible:ring-3 focus-visible:ring-brand-500 focus-visible:outline-hidden disabled:opacity-50"
+                @click="onAssign"
+              >
+                Assign
+              </button>
+            </div>
+
+            <p v-else class="text-xs text-brand-500">
+              A driver can only be assigned while the request is open.
+            </p>
+          </div>
         </div>
 
         <footer class="flex items-center gap-3 border-t border-brand-900 px-5 py-4">

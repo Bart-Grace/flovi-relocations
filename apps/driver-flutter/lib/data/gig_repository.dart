@@ -22,27 +22,36 @@ class GigRepository {
   /// client is how a message drifts away from the behaviour it describes.
   /// Gigs belonging to this driver, live.
   ///
-  /// Here the server-side filter IS safe, unlike the Available list. A row can only
-  /// leave this filter if `driver_id` is cleared, and the only thing that clears it is
-  /// `release_request` — which has no UI in this build. A dispatcher cancelling a booked
-  /// gig sets `status = 'cancelled'` and **keeps** the driver, by design of the
-  /// booked_requires_driver CHECK, so that update stays inside the filter and is
-  /// delivered normally.
+  /// This used to carry a server-side `.eq('driver_id', …)`, with a note saying the filter
+  /// would have to move client-side the moment a release button existed. That moment
+  /// arrived. `release_request` clears `driver_id`, so the row leaves the filter — and
+  /// SupabaseStreamBuilder pushes stream filters onto the realtime subscription while its
+  /// UPDATE branch only ever replaces or appends. The release would never be delivered and
+  /// the gig would hang in My gigs forever.
   ///
-  /// If a release button is ever added, this filter has to move client-side for the same
-  /// reason it had to in AvailableGigsPage: SupabaseStreamBuilder pushes stream filters
-  /// onto the realtime subscription, and its UPDATE branch never removes a record.
-  Stream<List<Map<String, dynamic>>> myGigs(String driverId) {
+  /// So the predicate lives in the caller now, exactly as it does in AvailableGigsPage.
+  Stream<List<Map<String, dynamic>>> allRequests() {
     return _client
         .from('relocation_requests')
         .stream(primaryKey: ['id'])
-        .eq('driver_id', driverId)
         .order('pickup_date', ascending: true);
   }
 
   Future<RelocationRequest> book(String id) async {
     final row = await _client.rpc<dynamic>(
       'book_request',
+      params: {'p_request_id': id},
+    );
+    return RelocationRequest.fromMap(Map<String, dynamic>.from(row as Map));
+  }
+
+  /// Give a booked gig back. Same shape as [book]: one guarded UPDATE inside
+  /// `release_request`, which checks the row is still yours and still booked. The
+  /// function shipped with the very first migration and only now has a button —
+  /// the guard was never the thing that was missing.
+  Future<RelocationRequest> release(String id) async {
+    final row = await _client.rpc<dynamic>(
+      'release_request',
       params: {'p_request_id': id},
     );
     return RelocationRequest.fromMap(Map<String, dynamic>.from(row as Map));

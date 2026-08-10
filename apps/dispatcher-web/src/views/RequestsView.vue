@@ -8,12 +8,13 @@ import {
   fetchRequests,
   requests,
   ensureDriverProfile,
+  fetchAssignablePeople,
   type RelocationRequest,
 } from '../composables/useRequests'
 import { useRequestsRealtime } from '../composables/useRealtime'
 
 onMounted(async () => {
-  await fetchRequests()
+  await Promise.all([fetchRequests(), fetchAssignablePeople()])
   // Rows that were already booked before this page loaded still need a face and a name.
   await Promise.all(
     [...new Set(requests.value.map((r) => r.driver_id).filter((id): id is string => !!id))].map(
