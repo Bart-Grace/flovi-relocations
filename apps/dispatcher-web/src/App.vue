@@ -1,9 +1,21 @@
 <script setup lang="ts">
+import { watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { missingEnv } from './lib/supabase'
+import { session } from './composables/useAuth'
+
+const router = useRouter()
+
+// Routing is driven by onAuthStateChange, not by a callback route. Signing in or out
+// anywhere in the app moves the user; the guard in router/index.ts handles direct hits.
+watch(session, (next, prev) => {
+  if (next && !prev) void router.replace({ name: 'requests' })
+  if (!next && prev) void router.replace({ name: 'signin' })
+})
 </script>
 
 <template>
-  <!-- Boot guard first: if configuration is missing, say which variable, never render blank. -->
+  <!-- Boot guard first: if configuration is missing, name the variable, never render blank. -->
   <div
     v-if="missingEnv.length"
     class="flex min-h-dvh items-center justify-center bg-red-50 p-6 dark:bg-red-950"
@@ -26,11 +38,5 @@ import { missingEnv } from './lib/supabase'
     </div>
   </div>
 
-  <div v-else class="flex min-h-dvh items-center justify-center bg-brand-950 p-6">
-    <div class="text-center">
-      <p class="font-mono text-xs tracking-widest text-brand-400 uppercase">Flovi</p>
-      <h1 class="mt-3 text-2xl font-semibold text-white">Dispatcher</h1>
-      <p class="mt-2 text-sm text-brand-300">Relocation requests · scaffold</p>
-    </div>
-  </div>
+  <RouterView v-else />
 </template>
