@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* v4: dark mode is a custom variant. darkMode:'class' and tailwind.config.js do not exist. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Brand: a cool slate-blue. Deliberately not Tailwind's default indigo — CLAUDE.md bans it. */
+  --color-brand-50: oklch(0.971 0.014 254);
+  --color-brand-100: oklch(0.936 0.031 254);
+  --color-brand-200: oklch(0.878 0.056 254);
+  --color-brand-300: oklch(0.798 0.091 254);
+  --color-brand-400: oklch(0.699 0.132 254);
+  --color-brand-500: oklch(0.606 0.158 254);
+  --color-brand-600: oklch(0.524 0.152 254);
+  --color-brand-700: oklch(0.448 0.128 254);
+  --color-brand-800: oklch(0.383 0.101 254);
+  --color-brand-900: oklch(0.334 0.078 254);
+  --color-brand-950: oklch(0.228 0.052 254);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --radius-card: 0.75rem;
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}

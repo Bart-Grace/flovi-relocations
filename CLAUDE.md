@@ -8,8 +8,11 @@ Every file is AI-generated. The operator never opens an editor. A fix arrives as
 |---|---|
 | vue 3.5.41 · vite 8.2.1 · vue-router 5.2.0 | Flutter 3.44.9 (Dart 3.12.2) |
 | tailwindcss 4.3.3 · @tailwindcss/vite 4.3.3 | supabase_flutter 2.17.1 (sdk >=3.9.0 <4.0.0) |
-| @supabase/supabase-js 2.112.2 · typescript 7.0.2 | google_fonts 8.2.1 |
+| @supabase/supabase-js 2.112.2 · **typescript 6.0.3** | google_fonts 8.2.1 |
 | node 24 (`.nvmrc`, Vercel build image) | `google_sign_in` is NOT a dependency |
+
+**Not TypeScript 7.** `vue-tsc` 3.3.9 resolves `typescript/lib/tsc`, which TS 7 no longer exports —
+`ERR_PACKAGE_PATH_NOT_EXPORTED`, build dead on arrival. 6.0.3 is the newest that works. Pin exactly, no `^`.
 
 ## Layout
 - `apps/dispatcher-web/` — Vue 3 + Vite + TS + Tailwind v4 · `apps/driver-flutter/` — Flutter web (CanvasKit)

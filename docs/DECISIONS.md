@@ -162,3 +162,38 @@ that is a question I could not answer honestly on stage.
 that returned the row to `open` and left the database clean for the demo.
 
 ---
+
+### T+50 — "Latest" was the wrong pin: TypeScript 7 breaks vue-tsc (prompt 03)
+
+**Prompt (abridged):** running Vite + Vue 3 + TS app with Tailwind v4 and a Supabase client, one signed-out
+placeholder. Out of scope: no auth flow, no router, no Pinia, no UI library.
+
+**What was wrong:** `npm run build` died before compiling anything:
+
+```
+Error [ERR_PACKAGE_PATH_NOT_EXPORTED]: Package subpath './lib/tsc' is not defined by "exports"
+in node_modules/typescript/package.json
+```
+
+**Root cause:** the pins in `CLAUDE.md` came from `npm view <pkg> version` — the newest published version of
+each package, resolved independently. That produced `typescript 7.0.2`, which restructured the package and
+no longer exports `./lib/tsc`; `vue-tsc` 3.3.9 requires exactly that path. Its declared peer range,
+`typescript: '>=5.0.0'`, is optimistic and does not describe reality.
+
+**How I diagnosed it:** the stack trace named `vue-tsc/index.js` calling `require.resolve` on a typescript
+subpath, so the failure was a package-layout mismatch, not our code. Confirmed by walking majors downward —
+6.0.3 works, 7.0.2 does not — instead of guessing.
+
+**What I changed:** pinned `typescript 6.0.3` exactly, no caret, and recorded the reason in `CLAUDE.md` so a
+later "upgrade to latest" does not silently reintroduce it. This is the failure mode of resolving each
+dependency's newest version in isolation: individually current, jointly incompatible.
+
+**Verified:** `npm run build` green · dev server answers 200 on :5173 with `<title>Flovi · Dispatcher</title>` ·
+`min-h-dvh`, `brand-950`, `tracking-widest` and `rounded-sm` all present in the emitted CSS, so Tailwind v4 is
+compiling · a build with `VITE_SUPABASE_URL` unset ships the string `VITE_SUPABASE_URL` and
+`Configuration missing` into the bundle — the boot guard names the variable instead of rendering white.
+
+**Cost:** ~9 min · verified by pasted build output, an HTTP 200 from the dev server, and greps of the emitted
+bundle.
+
+---
