@@ -421,3 +421,34 @@ going from empty to set — not merely "an update happened". Without that, every
 **Cost:** ~19 min · verified by a live booking driven from SQL while the deployed page sat untouched.
 
 ---
+
+### T+137 — The last open assumption resolved, and a default that runs the other way (prompt 10)
+
+**Prompt (abridged):** the Available tab lists open gigs and updates itself live. Out of scope: no booking
+action, no My gigs tab, no search, no filters, no map, no pull-to-refresh, no detail page.
+
+**The assumption this slice existed to settle.** `plan.md` §10 item 5 asked whether `supabase_flutter`
+auto-propagates the JWT to the Realtime socket the way supabase-js does **not** — and warned against assuming
+symmetry. The plan deliberately puts the read stream before booking so that, if the answer were no, it would
+surface on a path with no write consequences. **Answer: yes, it does.** The list populated and stayed live
+with no `setAuth` call anywhere in the Flutter app. The two SDKs genuinely differ here, and the only way to
+know was to run it.
+
+**What was wrong:** the first deploy listed gigs in the wrong order — 12 Dec above 12 Aug. `.order()` in the
+Dart client defaults to **descending**, the opposite of supabase-js, so `ascending: true` is not redundant
+noise but the whole behaviour. A driver looking for the next job wants the soonest pickup first; the
+descending list is subtly, plausibly wrong, which is the kind of defect that survives a demo.
+
+**A refusal designed away rather than handled.** `book_request` rejects a dispatcher booking their own gig,
+and it raises `This gig is no longer available` — the correct refusal with a misleading message. Instead of
+special-casing that error, gigs the current user dispatched are filtered out of the list, so the button is
+never offered. This is also the prompt's own rule in action: `.stream()` accepts exactly one filter on one
+column, so `status = 'open'` goes server-side and the second condition is a client-side `.where()`.
+
+**Verified in production:** the deployed driver URL listed three open gigs with route icon, date, price and
+an amber Open chip · a row inserted from SQL appeared **with no reload**, in the correct sorted position ·
+after the fix, order reads 12 Aug, 14 Aug, 16 Aug, 12 Dec · `flutter analyze` clean.
+
+**Cost:** ~17 min · verified by two live inserts against the deployed app.
+
+---

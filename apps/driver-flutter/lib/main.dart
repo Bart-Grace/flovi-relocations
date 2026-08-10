@@ -1,14 +1,14 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'features/gigs/available_gigs_page.dart';
+import 'theme.dart';
 
 // Config arrives via --dart-define only. There is no committed constants file, and these
 // names are exactly the ones scripts/deploy-driver.sh passes.
 const String kSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const String kSupabasePublishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
-
-const Color kSeed = Color(0xFF2563EB);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,22 +35,13 @@ Future<void> main() async {
 class FloviDriverApp extends StatelessWidget {
   const FloviDriverApp({super.key});
 
-  ThemeData _theme(Brightness brightness) {
-    final scheme = ColorScheme.fromSeed(seedColor: kSeed, brightness: brightness);
-    return ThemeData(
-      colorScheme: scheme,
-      useMaterial3: true,
-      textTheme: GoogleFonts.interTextTheme(ThemeData(brightness: brightness).textTheme),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flovi Driver',
       debugShowCheckedModeBanner: false,
-      theme: _theme(Brightness.light),
-      darkTheme: _theme(Brightness.dark),
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
       home: const AuthGate(),
     );
   }
@@ -203,7 +194,7 @@ class _HomeShellState extends State<HomeShell> {
       body: IndexedStack(
         index: _index,
         children: const [
-          _EmptyTab(label: 'Available gigs land here in the next slice.'),
+          AvailableGigsPage(),
           _EmptyTab(label: 'Your booked gigs land here.'),
         ],
       ),
