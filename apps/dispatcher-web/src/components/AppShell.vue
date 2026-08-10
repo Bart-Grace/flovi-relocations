@@ -16,30 +16,25 @@ const initials = computed(() =>
 
 <template>
   <div class="min-h-dvh bg-brand-950 text-white">
-    <!-- Left rail -->
-    <nav
-      class="fixed inset-y-0 left-0 hidden w-14 flex-col items-center gap-1 border-r border-brand-900 bg-brand-950 py-4 sm:flex"
-      aria-label="Main"
-    >
-      <span class="grid size-8 place-items-center rounded-(--radius-card) bg-brand-500 text-sm font-bold">
-        F
-      </span>
-      <span class="mt-3 grid size-9 place-items-center rounded-(--radius-card) bg-brand-900 text-brand-200 ring-1 ring-brand-800">
-        <svg class="size-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-        </svg>
-        <span class="sr-only">Requests</span>
-      </span>
-    </nav>
-
-    <div class="sm:pl-14">
+    <!-- No navigation rail. There is one screen in this product, and a rail holding a
+         single dead icon advertises the features that do not exist. The brand mark moves
+         into the topbar, where it costs nothing and claims nothing. -->
+    <div>
       <!-- Topbar -->
       <header
         class="flex items-center justify-between gap-4 border-b border-brand-900 px-5 py-3 sm:px-8"
       >
-        <div class="min-w-0">
-          <p class="font-mono text-[10px] tracking-[0.2em] text-brand-500 uppercase">Flovi</p>
-          <h1 class="truncate text-lg font-semibold">Relocation requests</h1>
+        <div class="flex min-w-0 items-center gap-3">
+          <span
+            class="grid size-9 shrink-0 place-items-center rounded-(--radius-card) bg-brand-500 text-sm font-bold"
+            aria-hidden="true"
+          >
+            F
+          </span>
+          <div class="min-w-0">
+            <p class="font-mono text-[10px] tracking-[0.2em] text-brand-500 uppercase">Flovi</p>
+            <h1 class="truncate text-lg font-semibold">Relocation requests</h1>
+          </div>
         </div>
 
         <div class="flex items-center gap-3">

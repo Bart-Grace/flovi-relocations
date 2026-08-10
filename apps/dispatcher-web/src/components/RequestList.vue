@@ -11,12 +11,15 @@ defineEmits<{ open: [RelocationRequest]; create: [] }>()
   <section
     class="overflow-hidden rounded-(--radius-card) border border-brand-800 bg-brand-900/40"
   >
+    <!-- This grid template is duplicated verbatim in RequestRow.vue, including the pl-5
+         offset for the status accent bar. They MUST stay identical: when they drifted,
+         every column header sat 6-18px away from the values under it. -->
     <header
-      class="hidden grid-cols-[minmax(0,1fr)_7rem_6rem_5.5rem] gap-4 border-b border-brand-800 px-5 py-2.5 text-xs font-medium tracking-wide text-brand-400 uppercase sm:grid"
+      class="hidden grid-cols-[minmax(0,1fr)_6rem_7rem_6.5rem] gap-4 border-b border-brand-800 py-2.5 pr-5 pl-6 text-xs font-medium tracking-wide text-brand-400 uppercase sm:grid"
     >
       <span>Route</span>
       <span>Pickup</span>
-      <span>Price</span>
+      <span class="text-right">Price</span>
       <span>Status</span>
     </header>
 

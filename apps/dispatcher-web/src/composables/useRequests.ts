@@ -49,7 +49,15 @@ export async function fetchRequests(): Promise<void> {
     .from('relocation_requests')
     .select(REQUEST_COLUMNS)
     .eq('dispatcher_id', uid)
-    .order('created_at', { ascending: false })
+    // Soonest pickup first — the same order the driver app uses, so the two screens agree
+    // when they sit side by side.
+    //
+    // `id` is the tiebreaker, and it is not decoration: rows created in one statement share
+    // a created_at to the microsecond, and without a deterministic second key Postgres is
+    // free to return ties in any order. An UPDATE then reshuffles the list, so a gig would
+    // appear to jump position the instant a driver books it — during the money shot.
+    .order('pickup_date', { ascending: true })
+    .order('id', { ascending: true })
     .returns<RelocationRequest[]>()
 
   loading.value = false

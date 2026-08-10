@@ -552,3 +552,40 @@ dead `_EmptyTab` placeholder was deleted rather than left behind.
 **Cost:** ~13 min · verified against production on two accounts.
 
 ---
+
+### T+185 — Design pass, and the defect only a booked row could reveal (prompt 13)
+
+**Ranked critique of the deployed dispatcher board, before touching anything:**
+
+1. **The left rail was a stub** — 46px holding a logo tile and one non-functional icon. A navigation rail
+   with a single dead item does not merely look unfinished, it *advertises* the features that do not exist.
+2. **Column headers missed their columns.** `PICKUP` sat at x≈935 with its values at 953; `PRICE` at 1039
+   with values ending at 1094. `RequestList`'s header used `minmax(0,1fr) 7rem 6rem 5.5rem` while
+   `RequestRow` used `… auto`. Two grid definitions for one table. A 6–18px drift nobody can name but
+   everybody reads as sloppy.
+3. **A booked row was indistinguishable except for a pill ~800px from the route** — and that row is exactly
+   what the camera points at during the money shot.
+
+**Fixed, in that order:** the rail is gone and the brand mark moved into the topbar, where it costs nothing
+and claims nothing · one grid template, duplicated verbatim with a comment in both files saying they must
+stay identical · rows that are no longer open carry a left accent bar in their status colour, so the flip is
+visible from across the room rather than findable by reading.
+
+**A regression I caused and caught.** Giving Status a fixed column width made the pill stretch to fill it —
+grid items justify to `stretch` by default — turning a badge into a wide box. `justify-self-start` restored
+it. Worth recording because the fix for defect 2 created defect 6, and only re-screenshotting after the
+change found it.
+
+**The defect that only appeared once a row was booked.** With four fixtures inserted in a single statement
+they share a `created_at` to the microsecond, and the list ordered by `created_at desc`. Postgres may return
+ties in any order, so the moment one row was UPDATEd it **jumped to the bottom of the list**. During the
+money shot a gig would appear to leap position the instant a driver takes it — indistinguishable from a bug,
+on camera. The list now orders by `pickup_date` ascending with `id` as a deterministic tiebreaker, which
+also makes the dispatcher board agree with the driver app when the two sit side by side.
+
+None of this was visible while every row was Open. The critique was done on a screenshot of the real
+deployed board, and the last defect only surfaced after booking one row to check the accent colour.
+
+**Cost:** ~22 min · verified by re-screenshotting production after each change.
+
+---
