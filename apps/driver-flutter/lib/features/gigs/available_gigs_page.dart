@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/relocation_request.dart';
+import 'book_sheet.dart';
 import 'gig_card.dart';
 
 class AvailableGigsPage extends StatefulWidget {
@@ -22,26 +23,36 @@ class _AvailableGigsPageState extends State<AvailableGigsPage> {
     super.initState();
     _uid = Supabase.instance.client.auth.currentUser!.id;
 
-    // .stream() takes exactly ONE filter on ONE column, then optionally .order()/.limit().
-    // A second .eq() is an analyzer error, so the second condition is applied client-side
-    // in _visible() below.
+    // NO server-side .eq('status', 'open') here, deliberately. Read the SDK:
+    // SupabaseStreamBuilder converts stream filters into a PostgresChangeFilter on the
+    // realtime subscription, so they are evaluated by the server — and its UPDATE handler
+    // only ever replaces or appends a record, never removes one. An UPDATE that moves a
+    // row OUT of the filter therefore never arrives, and the row stays in the local cache
+    // forever: a booked gig would sit in the Available list until a reload.
+    //
+    // So the whole predicate lives in _visible() below. The stream carries every change to
+    // the table and the client decides what is still available. That is also the only way
+    // the row can leave this list *via the stream* rather than by being removed by hand.
+    //
+    // ascending: true is NOT the default in the Dart client — .order() sorts descending
+    // unless told otherwise, the opposite of supabase-js. A driver wants the soonest
+    // pickup first, so this argument is load-bearing.
     _stream = Supabase.instance.client
         .from('relocation_requests')
         .stream(primaryKey: ['id'])
-        .eq('status', 'open')
-        // ascending: true is NOT the default in the Dart client — .order() sorts
-        // descending unless told otherwise, the opposite of supabase-js. A driver
-        // wants the soonest pickup first, so this argument is load-bearing.
         .order('pickup_date', ascending: true);
   }
 
-  /// The second filter, client-side: hide gigs this user dispatched themselves.
-  /// book_request rejects them via `dispatcher_id <> v_uid`, and it raises
-  /// "This gig is no longer available" — the right refusal for the wrong reason.
-  /// Better never to offer the button.
+  /// The entire predicate, client-side. See the note in initState for why none of it
+  /// can be pushed to the server.
+  ///
+  /// The second condition hides gigs this user dispatched themselves: book_request
+  /// rejects those via `dispatcher_id <> v_uid` and raises "This gig is no longer
+  /// available" — the right refusal carrying the wrong reason. Better never to offer
+  /// the button than to explain a misleading error.
   List<RelocationRequest> _visible(List<Map<String, dynamic>> rows) => rows
       .map(RelocationRequest.fromMap)
-      .where((r) => r.dispatcherId != _uid)
+      .where((r) => r.status == 'open' && r.dispatcherId != _uid)
       .toList();
 
   @override
@@ -73,7 +84,15 @@ class _AvailableGigsPageState extends State<AvailableGigsPage> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           itemCount: gigs.length,
           separatorBuilder: (_, _) => const SizedBox(height: 12),
-          itemBuilder: (context, i) => GigCard(request: gigs[i]),
+          itemBuilder: (context, i) => GigCard(
+            request: gigs[i],
+            onTap: () => showBookSheet(context, gigs[i]),
+            trailing: FilledButton.tonal(
+              onPressed: () => showBookSheet(context, gigs[i]),
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(42)),
+              child: const Text('Book'),
+            ),
+          ),
         );
       },
     );

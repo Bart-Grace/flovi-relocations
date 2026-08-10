@@ -452,3 +452,46 @@ after the fix, order reads 12 Aug, 14 Aug, 16 Aug, 12 Dec · `flutter analyze` c
 **Cost:** ~17 min · verified by two live inserts against the deployed app.
 
 ---
+
+### T+148 — A filtered stream never tells you a row left the filter (prompt 11)
+
+**Prompt (abridged):** one tap books a gig, with a confirmation step and a truthful failure path. Out of
+scope: no release UI, no optimistic removal, and **no client-side status check of any kind**.
+
+**What was wrong:** the booking succeeded — SnackBar confirmed it, and the database showed
+`Wrocław → Prague | booked | drivera.flovi@gmail.com` — but the gig **stayed in the Available list**.
+
+**Root cause, from reading the SDK rather than guessing.** In `supabase_stream_builder.dart`, stream filters
+are converted into a `PostgresChangeFilter` on the realtime subscription, so `.eq('status', 'open')` is
+evaluated **by the server**. And the UPDATE branch only ever replaces an existing record or appends a new
+one — it never removes. Put together: an UPDATE that moves a row *out* of the filter does not match the
+subscription, is never delivered, and the client never learns the row is gone. It sits in the local cache
+until a reload.
+
+**Why the obvious fix was the wrong one.** Removing the row by hand after a successful booking would have
+taken one line. The prompt forbids exactly that — "the row leaves the list via the stream, not manual
+removal" — and the constraint is right: a manual removal fixes the list for the driver who tapped, and
+leaves it stale for every other driver looking at the same gig, which is the case that matters.
+
+**What I changed:** dropped the server-side filter entirely. The stream now carries every change to the
+table and the whole predicate — `status == 'open' && dispatcherId != me` — is evaluated client-side. More
+events over the wire, and the only shape in which a row can leave the list *through the stream*.
+
+**Deliberately absent, and worth stating:** there is no `status == 'open'` check anywhere on the write path.
+Reading the row and checking it in Dart before calling the RPC is a time-of-check/time-of-use race — two
+drivers tapping in the same second both read `open`, both pass, both write. The guard is the single
+conditional UPDATE inside `book_request` and nowhere else. The client-side filter above decides what to
+*display*; it never decides whether a booking may proceed.
+
+**Verified in production:** bottom sheet, not an AlertDialog, showing route, pickup, payout and notes · the
+confirm button disables and shows a spinner while the call is in flight, so a double tap cannot become two
+RPC calls · after confirming, the SnackBar read "Booked Wrocław → Prague." and the row **left the list on
+its own** · the database confirms `booked` with the right driver and a non-null `booked_at`.
+
+**Still unverified:** the two-window double-booking test — the acceptance criterion that matters most —
+needs a second signed-in driver.
+
+**Cost:** ~24 min · verified by booking through the deployed app and reading the SDK source to explain the
+first failure.
+
+---
