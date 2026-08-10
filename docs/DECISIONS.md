@@ -266,3 +266,42 @@ not happen · the deployed `main.dart.js` contains the Supabase URL, so `--dart-
 deployed bundle.
 
 ---
+
+### T+82 — My own verification produced a false negative (prompt 07)
+
+**Prompt (abridged):** the dispatcher's main screen — persistent shell plus a list of my requests with
+colour-coded status pills. Out of scope: no create form, no edit, no realtime, no filters, no delete.
+
+**Two real defects, then one imaginary one.**
+
+**Real, first:** `vue-tsc` rejected the query result — `Conversion of type 'GenericStringError[]' to type
+'RelocationRequest[]' may be a mistake`. Without generated database types, supabase-js cannot infer a
+column list that is assembled at runtime, so it degrades to an error type. A cast would have silenced it and
+thrown away every remaining guarantee about that row shape. Used `.returns<RelocationRequest[]>()` instead,
+which states the intent at the query rather than laundering it afterwards.
+
+**Imaginary, second — and this is the one worth writing down.** Checking the deployed CSS for the five pill
+colours reported all five missing, plus `animate-pulse`. That reads like Tailwind failing to scan the class
+strings out of the TypeScript object in `StatusPill.vue`, which is a real and known v4 failure mode. It was
+not happening. The local `dist/` contained every class. The production fetch had pulled `index.html` from
+the CDN with `x-vercel-cache: HIT` — a **stale** HTML that still pointed at a previous CSS filename. Fetching
+with cache-control headers revealed a different asset hash, and that file contained all six classes.
+
+**What I take from it:** a verification step is code, and it fails the same ways code does. This one failed
+in the direction that manufactures work — it accused a component that was correct. Two habits fixed it:
+comparing the locally built asset hash against the one production actually references, and bypassing the
+CDN cache when asserting anything about a just-deployed file.
+
+**Incidental finding, kept:** local and Vercel builds are not byte-identical — 20354 vs 21056 bytes of CSS
+for the same commit, because Vercel rebuilds from source in its own environment. So `npm run build` locally
+is a fast-fail check, not evidence of what shipped. Every assertion about production is made against
+production.
+
+**Verified:** build green · the CSS that production actually serves contains all five status colours, the
+skeleton animation and the brand tokens · no banned default present in `src/` — no `bg-gray-100`, no
+`shadow-md`, no bare `<table>`, no `alert()`/`confirm()`, no literal "Loading..." (the only greps that hit
+were my own comments naming the ban).
+
+**Cost:** ~16 min, of which ~5 were spent on a defect that did not exist.
+
+---
