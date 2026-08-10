@@ -523,3 +523,32 @@ The sentence a driver reads is the sentence written next to the guard that produ
 **Cost:** ~12 min · verified across two Chrome profiles and two Google accounts against production.
 
 ---
+
+### T+165 — My gigs, and the same trap declined on purpose (prompt 12)
+
+**Prompt (abridged):** a My gigs tab listing this driver's booked gigs, live. Out of scope: no release
+action, no detail page, no history filter, no chat, no ratings, no earnings.
+
+**The interesting decision is what I did *not* change.** Prompt 11 had just forced the Available list's
+filter client-side, because `SupabaseStreamBuilder` pushes stream filters onto the realtime subscription and
+its UPDATE branch never removes a record — so a row leaving the filter is silently never reported. The
+reflex is to apply that everywhere. Here the server-side `.eq('driver_id', uid)` is kept, because a row can
+only leave *this* filter if `driver_id` is cleared, and the only thing that clears it is `release_request`,
+which has no UI in this build. A dispatcher cancelling a booked gig sets `status = 'cancelled'` and **keeps**
+the driver — that is what the `booked_requires_driver` CHECK was written to allow — so the update stays
+inside the filter and arrives normally.
+
+The condition under which this becomes a bug is written next to it: if a release button is ever added, the
+filter has to move client-side for exactly the reason it did in the Available list. A pattern applied
+without its precondition is how a fix becomes cargo cult.
+
+**Verified in production:** Driver A's My gigs showed **only** `Wrocław → Prague`, the gig he booked;
+`Kraków → Vienna`, booked by Driver B minutes earlier, was absent — the isolation the broad SELECT policy
+plus UI filtering is supposed to produce · booking a second gig for Driver A from SQL made it appear in the
+tab **with no reload**, sorted into the right position · the empty state is an illustrated widget with one
+line of copy and a CTA back to Available, never `Text('No gigs')` · `flutter analyze` clean, and the now
+dead `_EmptyTab` placeholder was deleted rather than left behind.
+
+**Cost:** ~13 min · verified against production on two accounts.
+
+---

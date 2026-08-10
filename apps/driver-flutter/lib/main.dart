@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'features/gigs/available_gigs_page.dart';
+import 'features/gigs/my_gigs_page.dart';
 import 'theme.dart';
 
 // Config arrives via --dart-define only. There is no committed constants file, and these
@@ -193,9 +194,9 @@ class _HomeShellState extends State<HomeShell> {
       // subscription — across switches.
       body: IndexedStack(
         index: _index,
-        children: const [
-          AvailableGigsPage(),
-          _EmptyTab(label: 'Your booked gigs land here.'),
+        children: [
+          const AvailableGigsPage(),
+          MyGigsPage(onBrowseAvailable: () => setState(() => _index = 0)),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -205,28 +206,6 @@ class _HomeShellState extends State<HomeShell> {
           NavigationDestination(icon: Icon(Icons.explore_outlined), label: 'Available'),
           NavigationDestination(icon: Icon(Icons.local_shipping_outlined), label: 'My gigs'),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyTab extends StatelessWidget {
-  const _EmptyTab({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: Theme.of(context)
-              .textTheme
-              .bodyMedium
-              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-        ),
       ),
     );
   }
