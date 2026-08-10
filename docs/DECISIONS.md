@@ -197,3 +197,31 @@ compiling · a build with `VITE_SUPABASE_URL` unset ships the string `VITE_SUPAB
 bundle.
 
 ---
+
+### T+55 — The deploy script's stdout contract leaked, and I had blamed the wrong command (prompt 04)
+
+**Prompt (abridged):** two idempotent deploy scripts, each printing the stable production alias as its final
+stdout line. Out of scope: no CI, no GitHub Actions, no git-connecting the Flutter project.
+
+**What was wrong:** the script printed 20 lines on stdout instead of one. I had already corrected the plan
+for this class of bug — Vercel CLI 58.x appends a JSON summary to stdout — and had redirected
+`vercel deploy` to stderr. The redirect worked. The noise was `npm ci && npm run build`, which I had never
+considered because I was looking for the failure I already knew about.
+
+**How I caught it:** asserting the contract instead of eyeballing the output — counting the lines on stdout
+and requiring exactly 1. Reading it would have shown a URL on the last line and looked correct.
+
+**What I changed:** `npm ci >&2 && npm run build >&2`, and the same treatment for `flutter build web` in
+`deploy-driver.sh` before that script had ever run. The contract is now stated in a comment in both files:
+stdout is exactly one line, the production alias.
+
+**Worth naming as a failure mode:** having a correct hypothesis made me stop looking. The fix for the known
+trap was right; the check that caught the unknown one was mechanical, not clever.
+
+**Verified:** stdout is 1 line, `https://flovi-dispatcher-bl.vercel.app` · anonymous `curl` returns 200 ·
+deep link `/requests/abc` returns 200, so the SPA rewrite is live · the deployed bundle contains
+`https://wzryktarwyjyryriqfyd.supabase.co`, so the build-time env inlining reached production.
+
+**Cost:** ~7 min · verified by a line count, three HTTP status codes, and a grep of the deployed bundle.
+
+---
