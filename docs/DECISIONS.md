@@ -488,10 +488,38 @@ confirm button disables and shows a spinner while the call is in flight, so a do
 RPC calls · after confirming, the SnackBar read "Booked Wrocław → Prague." and the row **left the list on
 its own** · the database confirms `booked` with the right driver and a non-null `booked_at`.
 
-**Still unverified:** the two-window double-booking test — the acceptance criterion that matters most —
-needs a second signed-in driver.
-
 **Cost:** ~24 min · verified by booking through the deployed app and reading the SDK source to explain the
 first failure.
+
+---
+
+### T+155 — The two-window double-booking test, through real UI
+
+**What was tested:** the correctness story of the whole build, and the only manual test in it, since there
+is no automated suite.
+
+**Setup, deliberately harsher than "two taps in the same second".** Driver A opened the booking sheet for
+`Kraków → Vienna` and left it open. Driver B — a different Google account in a different Chrome profile —
+then booked that same gig through the real app: SnackBar "Booked Kraków → Vienna.", row gone from his list.
+Driver A's list updated too: the gig disappeared **behind his still-open sheet**. Then Driver A confirmed.
+
+**Result, verbatim from the deployed app:**
+
+```
+This gig is no longer available
+```
+
+**Why this framing proves more than simultaneous taps.** At the moment Driver A pressed Confirm, his own
+client already knew the gig was gone — it had left his list seconds earlier — and the button was still
+there offering to book it. The refusal did not come from any client-side state. It came from the guarded
+UPDATE inside `book_request` matching zero rows. Had the protection been a `status == 'open'` check in Dart,
+this exact sequence would have sailed through it: the check would have read stale data, or been skipped
+entirely because the row was no longer in the local list.
+
+The message reached the driver unmodified because the repository does not translate `PostgrestException`.
+The sentence a driver reads is the sentence written next to the guard that produced it, in
+`0001_init.sql` — one string, one source, no drift.
+
+**Cost:** ~12 min · verified across two Chrome profiles and two Google accounts against production.
 
 ---
